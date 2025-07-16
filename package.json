@@ -12,6 +12,7 @@
     "start:stdio": "node build/stdio-server.js",
     "start:server": "node build/index.js",
     "dev": "tsc --watch",
+    "test": "npm run build && node build/test.js",
     "test:local": "npm run build && node build/test.js",
 
     "deploy": "serverless deploy",

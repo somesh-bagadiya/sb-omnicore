@@ -57,6 +57,18 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         name: 'Education Background',
         description: 'Academic background with coursework and achievements',
         mimeType: 'application/json'
+      },
+      {
+        uri: 'portfolio://tool-guide',
+        name: 'Tool Discovery Guide',
+        description: 'Complete reference for all available tools, parameters, and usage patterns',
+        mimeType: 'application/json'
+      },
+      {
+        uri: 'portfolio://content-coverage',
+        name: 'Content Coverage Report',
+        description: 'Show which projects have detailed content and their quality metrics',
+        mimeType: 'application/json'
       }
     ]
   };
@@ -199,6 +211,152 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         };
       }
 
+    case 'portfolio://tool-guide':
+      return {
+        contents: [{
+          uri: 'portfolio://tool-guide',
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            toolGuide: {
+              overview: "Complete reference for all MCP tools with usage patterns and examples",
+              workflow: "Use list_projects to explore → then get_project_details for specific projects",
+              totalTools: 5,
+              tools: {
+                get_profile: {
+                  purpose: "Get complete professional profile",
+                  usage: "Always call first to understand Somesh's background",
+                  noParameters: true
+                },
+                list_projects: {
+                  purpose: "Browse project portfolio (16 projects)",
+                  filterOptions: {
+                    domains: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"],
+                    popularTechnologies: ["Python", "React", "Next.js", "TypeScript", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"],
+                    featured: "Set to true for 6 highlighted projects"
+                  },
+                  examples: [
+                    "list_projects with featured=true",
+                    "list_projects with category='GenAI'",
+                    "list_projects with technology='Python'"
+                  ]
+                },
+                get_project_details: {
+                  purpose: "Get comprehensive project information with detailed content",
+                  autoIncludes: ["basic info", "detailed content sections", "word count", "content tier"],
+                  availableProjectIds: [
+                    "personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx",
+                    "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", 
+                    "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms",
+                    "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config",
+                    "quotation-generator-application", "iot-based-self-driving-car-with-adas", "high-on-tech",
+                    "creva", "voice-assistant"
+                  ],
+                  examples: [
+                    "get_project_details with id='introspect-ai'",
+                    "get_project_details with id='personal-portfolio-website'"
+                  ]
+                },
+                list_experiences: {
+                  purpose: "Get work experience with optional filtering",
+                  filterOptions: {
+                    sinceYear: "Filter by start year (e.g., 2020, 2022, 2024)",
+                    company: "Filter by exact company name",
+                    skill: "Filter by technology/skill used"
+                  }
+                },
+                list_education: {
+                  purpose: "Get academic background",
+                  filterOptions: {
+                    degreeType: "Filter by degree type (Master, Bachelor, Certificate)",
+                    institution: "Filter by exact institution name"
+                  }
+                }
+              },
+              commonWorkflows: [
+                "Portfolio Overview: get_profile → list_projects with featured=true",
+                "Project Deep Dive: list_projects with filters → get_project_details for specific projects",
+                "Tech Expertise: list_projects with technology filter → list_experiences with skill filter",
+                "Background Check: get_profile → list_experiences → list_education"
+              ]
+            }
+          }, null, 2)
+        }]
+      };
+
+    case 'portfolio://content-coverage':
+      try {
+        const projectsData: any = await client.fetchProjects();
+        const projects = projectsData?.projects || projectsData?.allProjects || projectsData;
+        
+        if (!Array.isArray(projects)) {
+          throw new Error("Invalid projects data structure");
+        }
+        
+        // Analyze content coverage across all projects
+        const contentAnalysis = await Promise.all(
+          projects.map(async (project: any) => {
+            const contentData = await client.fetchProjectContent(project.id);
+            return {
+              id: project.id,
+              title: project.title,
+              featured: project.featured || false,
+              hasDetailedContent: !!contentData,
+              contentTier: project.featured && contentData ? 'tier1' : contentData ? 'tier2' : 'tier3',
+              wordCount: contentData?.wordCount || 0,
+              sectionsAvailable: contentData?.sections ? Object.keys(contentData.sections) : [],
+              lastModified: contentData?.lastModified || null
+            };
+          })
+        );
+        
+        const summary = {
+          totalProjects: projects.length,
+          projectsWithContent: contentAnalysis.filter(p => p.hasDetailedContent).length,
+          tier1Projects: contentAnalysis.filter(p => p.contentTier === 'tier1').length,
+          tier2Projects: contentAnalysis.filter(p => p.contentTier === 'tier2').length,
+          tier3Projects: contentAnalysis.filter(p => p.contentTier === 'tier3').length,
+          averageWordCount: Math.round(
+            contentAnalysis.reduce((sum, p) => sum + p.wordCount, 0) / contentAnalysis.length
+          ),
+          contentCoverage: Math.round(
+            (contentAnalysis.filter(p => p.hasDetailedContent).length / projects.length) * 100
+          )
+        };
+        
+        return {
+          contents: [{
+            uri: 'portfolio://content-coverage',
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              contentCoverageReport: {
+                summary,
+                projectDetails: contentAnalysis,
+                recommendations: [
+                  summary.contentCoverage < 80 ? "Consider adding detailed content to more projects" : "Excellent content coverage",
+                  summary.tier1Projects < 6 ? "Consider promoting more projects to featured status" : "Good tier1 project representation",
+                  summary.averageWordCount < 500 ? "Consider expanding project descriptions" : "Good project detail depth"
+                ]
+              }
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          contents: [{
+            uri: 'portfolio://content-coverage',
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              error: "Failed to analyze content coverage",
+              message: `Error: ${error}`,
+              fallback: {
+                summary: { totalProjects: 16, contentCoverage: "Unknown" },
+                note: "Content analysis unavailable - check portfolio connection"
+              }
+            }, null, 2)
+          }]
+        };
+      }
+
     default:
       throw new Error(`Unknown resource: ${uri}`);
   }
@@ -309,7 +467,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "get_profile",
-        description: "Return Somesh Bagadiya's complete professional profile object",
+        description: "Return Somesh Bagadiya's complete professional profile object including personal information, skills, metrics, social links, and professional summary. Contains comprehensive context for portfolio discussions.",
         inputSchema: {
           type: "object",
           properties: {},
@@ -318,49 +476,78 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list_projects",
-        description: "Return project array with optional filters by category, technology, or featured status",
+        description: "Return complete project portfolio (16 projects) with optional filters. Available domains: 'GenAI', 'AI & Machine Learning', 'Computer Vision', 'Web & Cloud', 'IoT & Embedded', 'Data Analytics', 'AR/VR & Immersive Tech'. Popular technologies include: 'Python', 'React', 'Next.js', 'TypeScript', 'OpenCV', 'TensorFlow', 'PyTorch', 'RAG', 'FastAPI', 'OpenAI'. Set featured=true to get 6 highlighted projects. Projects with detailed content available.",
         inputSchema: {
           type: "object",
           properties: {
-            category: { type: "string", description: "Filter by project category" },
-            technology: { type: "string", description: "Filter by technology used" },
-            featured: { type: "boolean", description: "Filter by featured status" }
+            category: { 
+              type: "string", 
+              description: "Filter by project category/domain",
+              enum: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
+            },
+            technology: { 
+              type: "string", 
+              description: "Filter by specific technology (e.g., 'Python', 'React', 'OpenCV', 'TensorFlow', 'RAG', 'OpenAI')"
+            },
+            featured: { 
+              type: "boolean", 
+              description: "Filter by featured status - true returns 6 highlighted projects, false returns remaining projects"
+            }
           },
           required: []
         }
       },
       {
         name: "get_project_details",
-        description: "Return single project details by ID",
+        description: "Return complete project details by ID including structured content from detailed project files. Automatically includes: basic project info, detailed content sections (Overview, Technical Implementation, Challenges & Solutions, Results & Impact), word count, and content tier classification. Available project IDs: 'personal-portfolio-website', 'introspect-ai', 'carbon-sense-powered-by-ibm-watsonx', 'rage-chrome-extension-for-personalized-rag', 'reflectra-ai-digital-journal', 'email-intent-analysis', 'synchronous-traffic-signals', 'market-prediction-using-lstms', 'eye-tracking-and-gaze-tracking', 'dc-insulation-monitoring-system', 'port-config', 'quotation-generator-application', 'iot-based-self-driving-car-with-adas', 'high-on-tech', 'creva', 'voice-assistant'.",
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "Project ID to retrieve" }
+            id: { 
+              type: "string", 
+              description: "Project ID to retrieve. Must be one of the 16 available project IDs (e.g., 'introspect-ai', 'personal-portfolio-website', 'carbon-sense-powered-by-ibm-watsonx')",
+              enum: ["personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx", "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms", "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config", "quotation-generator-application", "iot-based-self-driving-car-with-adas", "high-on-tech", "creva", "voice-assistant"]
+            }
           },
           required: ["id"]
         }
       },
       {
         name: "list_experiences",
-        description: "Return work experience list with optional filters",
+        description: "Return comprehensive work experience list with optional filters. Includes roles, companies, achievements, and skills used. Filter by specific companies, years, or technologies/skills mentioned in job descriptions.",
         inputSchema: {
           type: "object",
           properties: {
-            sinceYear: { type: "number", description: "Filter experiences starting from this year" },
-            company: { type: "string", description: "Filter by company name" },
-            skill: { type: "string", description: "Filter by skill used" }
+            sinceYear: { 
+              type: "number", 
+              description: "Filter experiences starting from this year (e.g., 2020, 2022, 2024)"
+            },
+            company: { 
+              type: "string", 
+              description: "Filter by company name (exact match)"
+            },
+            skill: { 
+              type: "string", 
+              description: "Filter by skill or technology used in the role (e.g., 'Python', 'Machine Learning', 'React')"
+            }
           },
           required: []
         }
       },
       {
         name: "list_education",
-        description: "Return education list with optional filters",
+        description: "Return academic background including degrees, institutions, coursework, and achievements. Filter by degree type or institution name for specific educational information.",
         inputSchema: {
           type: "object",
           properties: {
-            degreeType: { type: "string", description: "Filter by degree type (e.g., 'Master', 'Bachelor')" },
-            institution: { type: "string", description: "Filter by institution name" }
+            degreeType: { 
+              type: "string", 
+              description: "Filter by degree type (e.g., 'Master', 'Bachelor', 'Certificate')"
+            },
+            institution: { 
+              type: "string", 
+              description: "Filter by institution name (exact match)"
+            }
           },
           required: []
         }
@@ -393,6 +580,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const data: any = await client.fetchProjects();
         let projects = data?.projects || data;
 
+        // Apply filters
         if (category) {
           projects = projects.filter((p: any) => p.category === category);
         }
@@ -403,8 +591,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           projects = projects.filter((p: any) => p.featured === featured);
         }
 
+        // Enhance projects with content availability indicators
+        const enhancedProjects = await Promise.all(
+          projects.map(async (project: any) => {
+            // Check if detailed content is available
+            const hasContent = await client.fetchProjectContent(project.id);
+            
+            return {
+              ...project,
+              hasDetailedContent: !!hasContent,
+              contentTier: project.featured && hasContent ? 'tier1' : hasContent ? 'tier2' : 'tier3',
+              contentPreview: hasContent ? 'Detailed content available via get_project_details' : 'Basic project info only'
+            };
+          })
+        );
+
+        // Add response metadata with usage suggestions
+        const response = {
+          projects: enhancedProjects,
+          summary: {
+            totalProjects: enhancedProjects.length,
+            withDetailedContent: enhancedProjects.filter(p => p.hasDetailedContent).length,
+            tier1Projects: enhancedProjects.filter(p => p.contentTier === 'tier1').length,
+            tier2Projects: enhancedProjects.filter(p => p.contentTier === 'tier2').length
+          },
+          nextActions: {
+            suggestion: "For detailed information about any project, use get_project_details with the project ID",
+            example: enhancedProjects.length > 0 ? `get_project_details with id='${enhancedProjects[0].id}'` : "No projects available"
+          }
+        };
+
         return {
-          content: [{ type: "text", text: JSON.stringify(projects, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };
       } catch (error) {
         return {
@@ -418,24 +636,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { id } = args as any;
         if (!id) throw new Error("Project ID is required");
         
-        const data: any = await client.fetchProjects();
-        // Fix: Use the correct data structure - allProjects contains the array
-        const projects = data?.allProjects || data?.featured || [];
-        if (!Array.isArray(projects)) {
-          throw new Error("Projects data is not in expected array format");
-        }
-        
-        // Fix: Support both id and title matching for robust ID system
-        const project = projects.find((p: any) => 
-          p.id === id || p.title === id
-        );
-        
-        if (!project) {
-          throw new Error(`Project with id '${id}' not found. Available projects: ${projects.map((p: any) => p.title || p.id).join(', ')}`);
-        }
+        // Use enhanced project details method that automatically loads detailed content
+        const enhancedProject = await client.fetchProjectDetails(id);
         
         return {
-          content: [{ type: "text", text: JSON.stringify(project, null, 2) }]
+          content: [{ type: "text", text: JSON.stringify(enhancedProject, null, 2) }]
         };
       } catch (error) {
         return {
