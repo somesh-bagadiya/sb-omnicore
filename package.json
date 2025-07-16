@@ -1,0 +1,42 @@
+{
+  "name": "portfolio-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server providing AI assistants with Somesh Bagadiya's portfolio context",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "portfolio-mcp-server": "build/stdio-server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start:stdio": "node build/stdio-server.js",
+    "start:server": "node build/index.js",
+    "dev": "tsc --watch",
+    "test:local": "npm run build && node build/test.js",
+
+    "deploy": "serverless deploy",
+    "offline": "serverless offline"
+  },
+  "keywords": [
+    "mcp",
+    "portfolio",
+    "ai",
+    "assistant",
+    "resume"
+  ],
+  "author": "Somesh Bagadiya",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.150",
+    "@types/node": "^20.14.0",
+    "@types/node-fetch": "^2.6.11",
+    "serverless": "^3.40.0",
+    "serverless-offline": "^13.9.0",
+    "typescript": "^5.5.0"
+  }
+}
