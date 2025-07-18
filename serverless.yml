@@ -1,4 +1,4 @@
-service: portfolio-mcp-server
+service: sb-omnicore-mcp
 
 frameworkVersion: '3'
 
@@ -25,7 +25,7 @@ provider:
 functions:
   mcpServer:
     handler: build/lambda.handler
-    description: 'Model Context Protocol server for Somesh Bagadiya portfolio'
+    description: 'SB-OMNICORE MCP server for Somesh Bagadiya portfolio'
     events:
       - http:
           path: /

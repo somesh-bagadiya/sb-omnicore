@@ -1,11 +1,11 @@
 {
-  "name": "portfolio-mcp-server",
+  "name": "sb-omnicore-mcp",
   "version": "1.0.0",
-  "description": "MCP server providing AI assistants with Somesh Bagadiya's portfolio context",
+  "description": "SB-OMNICORE MCP server providing AI assistants with Somesh Bagadiya's portfolio context",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "portfolio-mcp-server": "build/stdio-server.js"
+    "sb-omnicore-mcp": "build/stdio-server.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,6 @@
     "dev": "tsc --watch",
     "test": "npm run build && node build/test.js",
     "test:local": "npm run build && node build/test.js",
-
     "deploy": "serverless deploy",
     "offline": "serverless offline"
   },
@@ -28,7 +27,7 @@
   "author": "Somesh Bagadiya",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.15.1",
     "node-fetch": "^3.3.2",
     "zod": "^3.22.0"
   },

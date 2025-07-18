@@ -20,7 +20,7 @@ async function debugContentAPI() {
     const contentResponse = await fetch(`${PORTFOLIO_BASE_URL}/api/projects/content?projectId=${testProjectId}`, {
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Portfolio-MCP-Debug/1.0.0'
+        'User-Agent': 'SB-OMNICORE-MCP-Debug/1.0.0'
       }
     });
     
@@ -49,7 +49,7 @@ async function debugContentAPI() {
     const mcpResponse = await fetch(`${PORTFOLIO_BASE_URL}/api/mcp/projects?projectId=${testProjectId}`, {
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Portfolio-MCP-Debug/1.0.0'
+        'User-Agent': 'SB-OMNICORE-MCP-Debug/1.0.0'
       }
     });
     
@@ -83,7 +83,7 @@ async function debugContentAPI() {
       const response = await fetch(`${PORTFOLIO_BASE_URL}/api/projects/content?projectId=${projectId}`, {
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Portfolio-MCP-Debug/1.0.0'
+          'User-Agent': 'SB-OMNICORE-MCP-Debug/1.0.0'
         }
       });
       

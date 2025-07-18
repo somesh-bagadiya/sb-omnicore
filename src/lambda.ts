@@ -1,567 +1,503 @@
-// AWS Lambda types
-interface APIGatewayProxyEvent {
-  httpMethod: string;
-  path: string;
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { PortfolioClient } from './utils/client.js';
+
+// AWS Lambda Function URL types
+interface LambdaFunctionUrlEvent {
+  version?: string;
+  routeKey?: string;
+  rawPath?: string;
+  rawQueryString?: string;
+  headers?: Record<string, string>;
+  requestContext?: {
+    accountId: string;
+    apiId: string;
+    domainName: string;
+    domainPrefix: string;
+    http: {
+      method: string;
+      path: string;
+      protocol: string;
+      sourceIp: string;
+      userAgent: string;
+    };
+    requestId: string;
+    routeKey: string;
+    stage: string;
+    time: string;
+    timeEpoch: number;
+  };
   body?: string;
+  isBase64Encoded?: boolean;
+  // Legacy API Gateway compatibility
+  httpMethod?: string;
+  path?: string;
 }
 
-interface APIGatewayProxyResult {
+interface LambdaFunctionUrlResult {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
 }
-import { PortfolioClient } from './utils/client.js';
 
-// Create portfolio client instance
-const client = new PortfolioClient();
+// Import the configured server from index.ts
+// Note: We'll need to export the server instance from index.ts
+let serverInstance: Server | null = null;
+let transportInstance: StreamableHTTPServerTransport | null = null;
+
+// Initialize the MCP server (lazy initialization)
+async function initializeMCPServer(): Promise<{ server: Server; transport: StreamableHTTPServerTransport }> {
+  if (serverInstance && transportInstance) {
+    return { server: serverInstance, transport: transportInstance };
+  }
+
+  console.log('🚀 Initializing MCP server for Lambda...');
+  
+  // Create server instance (same configuration as in index.ts)
+  serverInstance = new Server(
+    {
+      name: "sb-omnicore-mcp",
+      version: "1.0.0",
+      description: "SB-OMNICORE: AI assistant with comprehensive context about Somesh Bagadiya's professional portfolio"
+    },
+    {
+      capabilities: {
+        resources: {},
+        prompts: {},
+        tools: {}
+      },
+    }
+  );
+
+  // Create portfolio client
+  const client = new PortfolioClient();
+
+  // Test API connection
+  try {
+    console.log('🔗 Testing portfolio API connection...');
+    await client.fetchProfile();
+    console.log('✅ Portfolio API connection successful');
+  } catch (error) {
+    console.error('⚠️ Portfolio API connection failed:', error);
+    // Continue anyway - the server will handle API errors gracefully
+  }
+
+  // Import and register all handlers from index.ts
+  // For now, we'll duplicate the registration logic here
+  // TODO: Refactor to share handler registration between stdio and http modes
+  
+  // Register resources (simplified version)
+  const { 
+    ListResourcesRequestSchema,
+    ReadResourceRequestSchema,
+    ListToolsRequestSchema,
+    CallToolRequestSchema,
+    ListPromptsRequestSchema,
+    GetPromptRequestSchema
+  } = await import('@modelcontextprotocol/sdk/types.js');
+
+  // Register resource handlers
+  serverInstance.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return {
+      resources: [
+        {
+          uri: 'portfolio://profile',
+          name: 'Developer Profile',
+          description: 'Comprehensive professional profile for Somesh Bagadiya',
+          mimeType: 'application/json'
+        },
+        {
+          uri: 'portfolio://projects',
+          name: 'Project Portfolio', 
+          description: 'Complete project portfolio with resume-optimized descriptions',
+          mimeType: 'application/json'
+        },
+        {
+          uri: 'portfolio://experience',
+          name: 'Work Experience',
+          description: 'Professional work history with resume-ready formatting',
+          mimeType: 'application/json'
+        },
+        {
+          uri: 'portfolio://education',
+          name: 'Education Background',
+          description: 'Academic background with coursework and achievements',
+          mimeType: 'application/json'
+        }
+      ]
+    };
+  });
+
+  serverInstance.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    
+    try {
+      switch (uri) {
+        case 'portfolio://profile':
+          const profileData = await client.fetchProfile();
+          return {
+            contents: [{
+              uri: 'portfolio://profile',
+              mimeType: 'application/json',
+              text: JSON.stringify(profileData, null, 2)
+            }]
+          };
+
+        case 'portfolio://projects':
+          const projectsData = await client.fetchProjects();
+          return {
+            contents: [{
+              uri: 'portfolio://projects',
+              mimeType: 'application/json',
+              text: JSON.stringify(projectsData, null, 2)
+            }]
+          };
+
+        case 'portfolio://experience':
+          const experienceData = await client.fetchExperience();
+          return {
+            contents: [{
+              uri: 'portfolio://experience',
+              mimeType: 'application/json',
+              text: JSON.stringify(experienceData, null, 2)
+            }]
+          };
+
+        case 'portfolio://education':
+          const educationData = await client.fetchEducation();
+          return {
+            contents: [{
+              uri: 'portfolio://education',
+              mimeType: 'application/json',
+              text: JSON.stringify(educationData, null, 2)
+            }]
+          };
+
+        default:
+          throw new Error(`Unknown resource: ${uri}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to read resource ${uri}: ${error}`);
+    }
+  });
+
+  // Register tool handlers
+  serverInstance.setRequestHandler(ListToolsRequestSchema, async () => {
+    return {
+      tools: [
+        {
+          name: "get_profile",
+          description: "Return Somesh Bagadiya's complete professional profile object including personal information, skills, metrics, social links, and professional summary.",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: []
+          }
+        },
+        {
+          name: "list_projects",
+          description: "Return complete project portfolio (16 projects) with optional filters. Pass all parameters in a single JSON object.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              category: { 
+                type: "string", 
+                description: "Filter by project category/domain. Must be one of the valid categories.",
+                enum: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
+              },
+              technology: { 
+                type: "string", 
+                description: "Filter by specific technology used in projects. Examples: 'Python', 'React', 'OpenCV', 'TensorFlow', 'RAG', 'OpenAI'"
+              },
+              featured: { 
+                type: "boolean", 
+                description: "Filter to show only featured projects (true) or all projects (false/undefined). Must be a boolean value, not a string."
+              }
+            },
+            required: [],
+            additionalProperties: false
+          }
+        },
+        {
+          name: "get_project_details",
+          description: "Return complete project details by ID including structured content from detailed project files.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              id: { 
+                type: "string", 
+                description: "Project ID to retrieve. Must be one of the 16 available project IDs.",
+                enum: ["personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx", "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms", "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config", "quotation-generator-application", "iot-based-self-driving-car-with-adas", "high-on-tech", "creva", "voice-assistant"]
+              }
+            },
+            required: ["id"]
+          }
+        },
+        {
+          name: "list_experiences",
+          description: "Return comprehensive work experience list with optional filters.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              sinceYear: { 
+                type: "number", 
+                description: "Filter experiences starting from this year (e.g., 2020, 2022, 2024)"
+              },
+              company: { 
+                type: "string", 
+                description: "Filter by company name (exact match)"
+              },
+              skill: { 
+                type: "string", 
+                description: "Filter by skill or technology used in the role (e.g., 'Python', 'Machine Learning', 'React')"
+              }
+            },
+            required: []
+          }
+        },
+        {
+          name: "list_education",
+          description: "Return academic background including degrees, institutions, coursework, and achievements.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              degreeType: { 
+                type: "string", 
+                description: "Filter by degree type (e.g., 'Master', 'Bachelor', 'Certificate')"
+              },
+              institution: { 
+                type: "string", 
+                description: "Filter by institution name (exact match)"
+              }
+            },
+            required: []
+          }
+        }
+      ]
+    };
+  });
+
+  serverInstance.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+
+    switch (name) {
+      case "get_profile":
+        try {
+          const data = await client.fetchProfile();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error fetching profile: ${error}` }],
+            isError: true
+          };
+        }
+
+      case "list_projects":
+        try {
+          // Use the same enhanced logic from index.ts
+          const params = args || {};
+          const { category, technology, featured } = params;
+          
+          const data: any = await client.fetchProjects();
+          let projects = data?.allProjects || data?.projects || data;
+          
+          if (!Array.isArray(projects)) {
+            return {
+              content: [{ type: "text", text: JSON.stringify({
+                error: "Invalid data structure",
+                message: "Projects data is not in the expected array format"
+              }, null, 2) }],
+              isError: true
+            };
+          }
+
+          // Apply filters
+          if (category) {
+            projects = projects.filter((p: any) => {
+              if (Array.isArray(p.domain)) {
+                return p.domain.includes(category);
+              }
+              return p.category === category || p.domain === category;
+            });
+          }
+          
+          if (technology) {
+            projects = projects.filter((p: any) => {
+              const technologies = p.technologies || p.tech || p.stack || [];
+              return Array.isArray(technologies) ? technologies.includes(technology) : false;
+            });
+          }
+          
+          if (featured !== undefined) {
+            projects = projects.filter((p: any) => p.featured === featured);
+          }
+
+          return {
+            content: [{ type: "text", text: JSON.stringify({ projects }, null, 2) }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error fetching projects: ${error}` }],
+            isError: true
+          };
+        }
+
+      case "get_project_details":
+        try {
+          const { id } = args as any;
+          if (!id) throw new Error("Project ID is required");
+          
+          const enhancedProject = await client.fetchProjectDetails(id);
+          
+          return {
+            content: [{ type: "text", text: JSON.stringify(enhancedProject, null, 2) }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error fetching project details: ${error}` }],
+            isError: true
+          };
+        }
+
+      case "list_experiences":
+        try {
+          const data = await client.fetchExperience();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error fetching experiences: ${error}` }],
+            isError: true
+          };
+        }
+
+      case "list_education":
+        try {
+          const data = await client.fetchEducation();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+          };
+        } catch (error) {
+          return {
+            content: [{ type: "text", text: `Error fetching education: ${error}` }],
+            isError: true
+          };
+        }
+
+      default:
+        return {
+          content: [{ type: "text", text: `Unknown tool: ${name}` }],
+          isError: true
+        };
+    }
+  });
+
+  // Create transport for Lambda (stateless mode)
+  transportInstance = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined // Stateless mode for Lambda
+  });
+
+  // Connect server to transport
+  await serverInstance.connect(transportInstance);
+  
+  console.log('✅ MCP server initialized for Lambda deployment');
+  
+  return { server: serverInstance, transport: transportInstance };
+}
+
+// Convert Lambda event to HTTP request format for StreamableHTTPServerTransport
+function lambdaEventToHttpRequest(event: LambdaFunctionUrlEvent): {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: string | undefined;
+} {
+  const method = event.requestContext?.http?.method || event.httpMethod || 'POST';
+  const path = event.requestContext?.http?.path || event.rawPath || event.path || '/';
+  const queryString = event.rawQueryString || '';
+  const url = queryString ? `${path}?${queryString}` : path;
+  
+  const headers = event.headers || {};
+  const body = event.body;
+
+  return { method, url, headers, body };
+}
 
 // Lambda handler for MCP server
 export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+  event: LambdaFunctionUrlEvent
+): Promise<LambdaFunctionUrlResult> => {
   try {
-    console.log(`Request: ${event.httpMethod} ${event.path}`);
+    console.log('🔗 SB-OMNICORE MCP Lambda handler invoked');
+    console.log('Event type:', event.version ? 'Function URL' : 'API Gateway');
+    
+    // Initialize MCP server (lazy initialization)
+    const { server, transport } = await initializeMCPServer();
+    
+    // Convert Lambda event to HTTP request format
+    const httpRequest = lambdaEventToHttpRequest(event);
+    console.log(`Request: ${httpRequest.method} ${httpRequest.url}`);
+    
+    // Create mock request/response objects for StreamableHTTPServerTransport
+    const mockRequest = {
+      method: httpRequest.method,
+      url: httpRequest.url,
+      headers: httpRequest.headers,
+      body: httpRequest.body,
+      on: () => {},
+      once: () => {},
+      emit: () => {},
+      pipe: () => {}
+    };
 
-    // Handle MCP server info endpoint
-    if (event.path === '/' && event.httpMethod === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-        },
-        body: JSON.stringify({
-          name: 'Portfolio MCP Server',
-          version: '1.0.0',
-          description: 'Model Context Protocol server for Somesh Bagadiya portfolio',
-          capabilities: {
-            resources: true,
-            prompts: true,
-            tools: true
-          },
-          endpoints: {
-            resources: ['portfolio://profile', 'portfolio://projects', 'portfolio://experience', 'portfolio://education'],
-            prompts: ['resume-assistant'],
-            tools: ['get_profile', 'list_projects', 'get_project_details', 'list_experiences', 'list_education']
-          },
-          portfolioBaseUrl: process.env.PORTFOLIO_BASE_URL || 'https://someshbagadiya.dev',
-          status: 'operational',
-          timestamp: new Date().toISOString()
-        })
-      };
-    }
-
-    // Handle resource requests - list all resources
-    if (event.path === '/resources' && event.httpMethod === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          resources: [
-            {
-              uri: 'portfolio://profile',
-              name: 'Developer Profile',
-              description: 'Comprehensive professional profile for Somesh Bagadiya',
-              mimeType: 'application/json'
-            },
-            {
-              uri: 'portfolio://projects',
-              name: 'Project Portfolio', 
-              description: 'Complete project portfolio with resume-optimized descriptions',
-              mimeType: 'application/json'
-            },
-            {
-              uri: 'portfolio://experience',
-              name: 'Work Experience',
-              description: 'Professional work history with resume-ready formatting',
-              mimeType: 'application/json'
-            },
-            {
-              uri: 'portfolio://education',
-              name: 'Education Background',
-              description: 'Academic background with coursework and achievements',
-              mimeType: 'application/json'
-            }
-          ]
-        })
-      };
-    }
-
-    // Handle specific resource reading
-    if (event.path?.startsWith('/resource/') && event.httpMethod === 'GET') {
-      const resourceName = event.path.replace('/resource/', '');
-      
-      let data;
-      try {
-        switch (resourceName) {
-          case 'profile':
-            data = await client.fetchProfile();
-            break;
-          case 'projects':
-            data = await client.fetchProjects();
-            break;
-          case 'experience':
-            data = await client.fetchExperience();
-            break;
-          case 'education':
-            data = await client.fetchEducation();
-            break;
-          default:
-            throw new Error(`Unknown resource: ${resourceName}`);
-        }
-
-        return {
-          statusCode: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            contents: [{
-              uri: `portfolio://${resourceName}`,
-              mimeType: 'application/json',
-                             text: JSON.stringify({
-                 ...(data as Record<string, any>),
-                 context: {
-                   lastUpdated: new Date().toISOString(),
-                   source: "Live portfolio data via MCP server",
-                   usage: "MCP resource data for AI assistants"
-                 }
-               }, null, 2)
-            }]
-          })
-        };
-      } catch (error) {
-        return {
-          statusCode: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            error: `Failed to fetch ${resourceName} data`,
-            message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
-          })
-        };
+    const mockResponse = {
+      statusCode: 200,
+      headers: {} as Record<string, string>,
+      body: '',
+      writeHead: (statusCode: number, headers?: Record<string, string>) => {
+        mockResponse.statusCode = statusCode;
+        if (headers) Object.assign(mockResponse.headers, headers);
+      },
+      write: (data: string) => {
+        mockResponse.body += data;
+      },
+      end: (data?: string) => {
+        if (data) mockResponse.body += data;
+      },
+      setHeader: (name: string, value: string) => {
+        mockResponse.headers[name] = value;
       }
-    }
+    };
 
-    // Handle prompts requests
-    if (event.path === '/prompts' && event.httpMethod === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          prompts: [
-            {
-              name: 'resume-assistant',
-              description: 'AI behavior guide for acting as Somesh\'s resume and career assistant',
-              arguments: []
-            }
-          ]
-        })
-      };
-    }
+    // Handle the request through the MCP StreamableHTTPServerTransport
+    await transport.handleRequest(mockRequest as any, mockResponse as any);
+    
+    const response = {
+      status: mockResponse.statusCode,
+      headers: mockResponse.headers,
+      body: mockResponse.body
+    };
 
-    // Handle specific prompt requests
-    if (event.path?.startsWith('/prompt/') && event.httpMethod === 'GET') {
-      const promptName = event.path.replace('/prompt/', '');
-      
-      if (promptName === 'resume-assistant') {
-        return {
-          statusCode: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            description: 'AI behavior guide for acting as Somesh\'s resume and career assistant',
-            messages: [{
-              role: 'user',
-              content: {
-                type: 'text',
-                text: `You are Somesh Bagadiya's AI career assistant with comprehensive knowledge about his professional background. Your primary role is to help with resume tailoring and interview preparation.
-
-## ABOUT SOMESH:
-- **Name**: Somesh Bagadiya  
-- **Role**: AI/ML & Software Engineer
-- **Location**: San Jose, CA  
-- **Experience**: 4+ years with 16+ completed projects
-- **Current Status**: Machine Learning Researcher at SJSU Research Foundation
-- **Education**: MS in AI (SJSU, 2025), BE in IT (SPPU, 2021)
-
-## EXPERTISE AREAS:
-- **AI/ML**: PyTorch, TensorFlow, LLMs/Transformers, RAG systems, GenAI
-- **Computer Vision**: Image processing, object detection, deep learning
-- **Web Development**: React, Next.js, FastAPI, full-stack development  
-- **Cloud & DevOps**: AWS, Docker, deployment optimization
-- **Languages**: Python (expert), JavaScript/TypeScript (advanced), C++ (intermediate)
-
-## CURRENT FEATURED PROJECTS (Top 6):
-1. **Personal Portfolio Website** - Next.js with dynamic filtering
-2. **Introspect AI** - Mental health monitoring with knowledge graphs and RAG
-3. **CarbonSense powered by IBM WatsonX** - AI-driven carbon footprint platform
-4. **RAGE Chrome Extension** - Personalized RAG system using NVIDIA NIMs
-5. **Reflectra AI Digital Journal** - AI journaling with agentic pipeline
-6. **Email Intent Analysis** - NLP-based email classification system
-
-## WORK EXPERIENCE PROGRESSION:
-1. **Machine Learning Researcher** - SJSU Research Foundation (Jun 2024 - Present)
-2. **Software Engineer Intern** - Artonifs (May 2024 - Aug 2024)  
-3. **Software Engineer** - Cognizant - COX (Mar 2021 - Jul 2023)
-4. **Data Engineer Intern** - Biencaps Systems (May 2020 - Feb 2021)
-
-## YOUR RESPONSIBILITIES:
-
-### Resume Tailoring:
-1. **Analyze job requirements** and match with Somesh's relevant experience
-2. **Select appropriate projects** from the 16-project portfolio based on role requirements
-3. **Use actual achievement bullet points** from work experience (already quantified)
-4. **Optimize technical keywords** for ATS systems
-5. **Balance technical depth** with business impact based on role type
-
-### Interview Preparation:
-1. **Provide specific examples** from actual projects for behavioral questions
-2. **Explain technical implementations** with appropriate detail level
-3. **Highlight problem-solving approaches** demonstrated in past work
-4. **Connect experiences** to target company's domain and challenges
-
-### Communication Style:
-- **Professional but approachable** - suitable for career discussions
-- **Technical accuracy** - use correct terminology and frameworks
-- **Impact-focused** - always emphasize results and value delivered
-- **Contextual adaptation** - adjust technical depth based on audience
-
-## INSTRUCTIONS:
-1. **Always use the provided resources** to get accurate, up-to-date information
-2. **Reference specific projects and achievements** with real details from the data
-3. **Tailor recommendations** to the specific job or company mentioned
-4. **Provide actionable advice** - specific bullet points, keywords, examples
-5. **Ask clarifying questions** if you need more context about the opportunity
-
-Remember: You represent Somesh professionally. Always be accurate, helpful, and focused on advancing his career goals.`
-              }
-            }]
-          })
-        };
-      } else {
-        return {
-          statusCode: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            error: 'Prompt not found',
-            message: `Unknown prompt: ${promptName}`,
-            availablePrompts: ['resume-assistant']
-          })
-        };
-      }
-    }
-
-    // Handle tools requests - list all tools
-    if (event.path === '/tools' && event.httpMethod === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          tools: [
-            {
-              name: "get_profile",
-              description: "Return Somesh Bagadiya's complete professional profile object",
-              inputSchema: {
-                type: "object",
-                properties: {},
-                required: []
-              }
-            },
-            {
-              name: "list_projects",
-              description: "Return project array with optional filters by category, technology, or featured status",
-              inputSchema: {
-                type: "object",
-                properties: {
-                  category: { type: "string", description: "Filter by project category" },
-                  technology: { type: "string", description: "Filter by technology used" },
-                  featured: { type: "boolean", description: "Filter by featured status" }
-                },
-                required: []
-              }
-            },
-            {
-              name: "get_project_details",
-              description: "Return single project details by ID",
-              inputSchema: {
-                type: "object",
-                properties: {
-                  id: { type: "string", description: "Project ID to retrieve" }
-                },
-                required: ["id"]
-              }
-            },
-            {
-              name: "list_experiences",
-              description: "Return work experience list with optional filters",
-              inputSchema: {
-                type: "object",
-                properties: {
-                  sinceYear: { type: "number", description: "Filter experiences starting from this year" },
-                  company: { type: "string", description: "Filter by company name" },
-                  skill: { type: "string", description: "Filter by skill used" }
-                },
-                required: []
-              }
-            },
-            {
-              name: "list_education",
-              description: "Return education list with optional filters",
-              inputSchema: {
-                type: "object",
-                properties: {
-                  degreeType: { type: "string", description: "Filter by degree type (e.g., 'Master', 'Bachelor')" },
-                  institution: { type: "string", description: "Filter by institution name" }
-                },
-                required: []
-              }
-            }
-          ]
-        })
-      };
-    }
-
-    // Handle tool calls via POST
-    if (event.path === '/tools/call' && event.httpMethod === 'POST') {
-      try {
-        const body = JSON.parse(event.body || '{}');
-        const { name, arguments: args } = body;
-
-        let result;
-        switch (name) {
-          case "get_profile":
-            try {
-              const data = await client.fetchProfile();
-              result = {
-                content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
-              };
-            } catch (error) {
-              result = {
-                content: [{ type: "text", text: `Error fetching profile: ${error}` }],
-                isError: true
-              };
-            }
-            break;
-
-          case "list_projects":
-            try {
-              const { category, technology, featured } = args || {};
-              const data: any = await client.fetchProjects();
-              
-              // Handle different possible data structures
-              let projects = [];
-              if (Array.isArray(data)) {
-                projects = data;
-              } else if (data?.allProjects && Array.isArray(data.allProjects)) {
-                projects = data.allProjects;
-              } else if (data?.projects && Array.isArray(data.projects)) {
-                projects = data.projects;
-              } else {
-                throw new Error("Invalid projects data structure received from API");
-              }
-
-              // Apply filters
-              if (category) {
-                projects = projects.filter((p: any) => p.domain?.includes(category));
-              }
-              if (technology) {
-                projects = projects.filter((p: any) => p.tech?.includes(technology));
-              }
-              if (featured !== undefined) {
-                projects = projects.filter((p: any) => p.featured === featured);
-              }
-
-              result = {
-                content: [{ type: "text", text: JSON.stringify(projects, null, 2) }]
-              };
-            } catch (error) {
-              result = {
-                content: [{ type: "text", text: `Error fetching projects: ${error}` }],
-                isError: true
-              };
-            }
-            break;
-
-          case "get_project_details":
-            try {
-              const { id } = args || {};
-              if (!id) throw new Error("Project ID is required");
-              
-              const data: any = await client.fetchProjects();
-              
-              // Handle different possible data structures
-              let projects = [];
-              if (Array.isArray(data)) {
-                projects = data;
-              } else if (data?.allProjects && Array.isArray(data.allProjects)) {
-                projects = data.allProjects;
-              } else if (data?.projects && Array.isArray(data.projects)) {
-                projects = data.projects;
-              } else {
-                throw new Error("Invalid projects data structure received from API");
-              }
-              
-              const project = projects.find((p: any) => p.id === id);
-              
-              if (!project) {
-                throw new Error(`Project with id '${id}' not found. Available IDs: ${projects.map((p: any) => p.id).join(', ')}`);
-              }
-              
-              result = {
-                content: [{ type: "text", text: JSON.stringify(project, null, 2) }]
-              };
-            } catch (error) {
-              result = {
-                content: [{ type: "text", text: `Error fetching project details: ${error}` }],
-                isError: true
-              };
-            }
-            break;
-
-          case "list_experiences":
-            try {
-              const { sinceYear, company, skill } = args || {};
-              const data: any = await client.fetchExperience();
-              let experiences = data?.experiences || data;
-
-              if (sinceYear) {
-                experiences = experiences.filter((e: any) => {
-                  const year = parseInt(e.startDate?.substring(0, 4) || "0");
-                  return year >= sinceYear;
-                });
-              }
-              if (company) {
-                experiences = experiences.filter((e: any) => e.company?.toLowerCase() === company.toLowerCase());
-              }
-              if (skill) {
-                experiences = experiences.filter((e: any) => e.skills?.includes(skill));
-              }
-
-              result = {
-                content: [{ type: "text", text: JSON.stringify(experiences, null, 2) }]
-              };
-            } catch (error) {
-              result = {
-                content: [{ type: "text", text: `Error fetching experiences: ${error}` }],
-                isError: true
-              };
-            }
-            break;
-
-          case "list_education":
-            try {
-              const { degreeType, institution } = args || {};
-              const data: any = await client.fetchEducation();
-              let education = data?.education || data;
-
-              if (degreeType) {
-                education = education.filter((ed: any) => ed.degree?.toLowerCase().includes(degreeType.toLowerCase()));
-              }
-              if (institution) {
-                education = education.filter((ed: any) => ed.institution?.toLowerCase().includes(institution.toLowerCase()));
-              }
-
-              result = {
-                content: [{ type: "text", text: JSON.stringify(education, null, 2) }]
-              };
-            } catch (error) {
-              result = {
-                content: [{ type: "text", text: `Error fetching education: ${error}` }],
-                isError: true
-              };
-            }
-            break;
-
-
-
-          default:
-            throw new Error(`Unknown tool: ${name}`);
-        }
-
-        return {
-          statusCode: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify(result)
-        };
-
-      } catch (error) {
-        return {
-          statusCode: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          },
-          body: JSON.stringify({
-            error: 'Tool call failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: new Date().toISOString()
-          })
-        };
-      }
-    }
-
-    // Handle CORS preflight requests
-    if (event.httpMethod === 'OPTIONS') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-        },
-        body: ''
-      };
-    }
-
-    // Default response for unhandled paths
+    // Convert MCP transport response to Lambda response format
     return {
-      statusCode: 404,
+      statusCode: response.status || 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        ...response.headers
       },
-      body: JSON.stringify({
-        error: 'Not Found',
-        message: 'The requested endpoint does not exist',
-        availableEndpoints: {
-          '/': 'Server info',
-          '/resources': 'List all resources',
-          '/resource/{resourceName}': 'Get specific resource (profile, projects, experience, education)',
-          '/prompts': 'List all prompts',
-          '/prompt/{promptName}': 'Get specific prompt (resume-assistant)',
-          '/tools': 'List all tools',
-          '/tools/call': 'Call a specific tool (POST with {name, arguments})'
-        }
-      })
+      body: response.body || ''
     };
 
   } catch (error) {
-    console.error('Lambda handler error:', error);
+    console.error('❌ Lambda handler error:', error);
     
+    // Return standardized error response
     return {
       statusCode: 500,
       headers: {
@@ -569,9 +505,10 @@ Remember: You represent Somesh professionally. Always be accurate, helpful, and 
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        error: 'Internal Server Error',
-        message: 'An error occurred while processing your request',
-        timestamp: new Date().toISOString()
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+        service: 'SB-OMNICORE MCP Server'
       })
     };
   }

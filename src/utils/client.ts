@@ -11,7 +11,7 @@ export class PortfolioClient {
     this.baseUrl = `${PORTFOLIO_BASE_URL}/api/mcp`;
     this.headers = {
       'Content-Type': 'application/json',
-      'User-Agent': 'Portfolio-MCP-Server/1.0.0'
+      'User-Agent': 'SB-OMNICORE-MCP/1.0.0'
     };
     
     console.log(`🔗 Connecting to Portfolio APIs at: ${this.baseUrl}`);
@@ -273,7 +273,7 @@ export class PortfolioClient {
       
       // Fallback to known project IDs
       return [
-        "personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx",
+        "sb-omnicore-mcp-server", "personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx",
         "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", 
         "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms",
         "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config",
@@ -284,7 +284,7 @@ export class PortfolioClient {
       console.error('Error fetching project IDs:', error);
       // Return fallback project IDs
       return [
-        "personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx",
+        "sb-omnicore-mcp-server", "personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx",
         "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", 
         "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms",
         "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config",
@@ -346,15 +346,17 @@ export class PortfolioClient {
       
       // Fallback to popular technologies
       return [
-        "Python", "React", "Next.js", "TypeScript", "JavaScript", "OpenCV", "TensorFlow", 
-        "PyTorch", "RAG", "FastAPI", "OpenAI", "HTML", "CSS", "AWS", "Unity 3D", "C#", 
+        "TypeScript", "Node.js", "MCP Protocol", "AWS Lambda", "API Integration", "RAG Systems",
+        "Python", "React", "Next.js", "JavaScript", "OpenCV", "PyTorch", 
+        "TensorFlow", "RAG", "FastAPI", "OpenAI", "HTML", "CSS", "AWS", "Unity 3D", "C#", 
         "C++", "Arduino", "Raspberry Pi", "Neo4j", "ChromaDB"
       ];
     } catch (error) {
       console.error('Error fetching technologies:', error);
       return [
-        "Python", "React", "Next.js", "TypeScript", "JavaScript", "OpenCV", "TensorFlow", 
-        "PyTorch", "RAG", "FastAPI", "OpenAI", "HTML", "CSS", "AWS", "Unity 3D", "C#", 
+        "TypeScript", "Node.js", "MCP Protocol", "AWS Lambda", "API Integration", "RAG Systems",
+        "Python", "React", "Next.js", "JavaScript", "OpenCV", "PyTorch", 
+        "TensorFlow", "RAG", "FastAPI", "OpenAI", "HTML", "CSS", "AWS", "Unity 3D", "C#", 
         "C++", "Arduino", "Raspberry Pi", "Neo4j", "ChromaDB"
       ];
     }
@@ -393,11 +395,11 @@ export class PortfolioClient {
     } catch (error) {
       console.error('Error getting data discovery:', error);
       return {
-        projectIds: ["personal-portfolio-website", "introspect-ai"],
+        projectIds: ["sb-omnicore-mcp-server", "personal-portfolio-website", "introspect-ai"],
         domains: ["GenAI", "Web & Cloud"],
-        technologies: ["Python", "React", "TypeScript"],
-        totalProjects: 16,
-        featuredCount: 6
+        technologies: ["TypeScript", "Node.js", "MCP Protocol", "Python", "React"],
+        totalProjects: 17,
+        featuredCount: 7
       };
     }
   }

@@ -14,9 +14,9 @@ import { PortfolioClient } from './utils/client.js';
 // Create MCP server instance
 const server = new Server(
   {
-    name: "portfolio-mcp-server",
+    name: "sb-omnicore-mcp",
     version: "1.0.0",
-    description: "AI assistant with comprehensive context about Somesh Bagadiya's professional portfolio"
+          description: "SB-OMNICORE: AI assistant with comprehensive context about Somesh Bagadiya's professional portfolio"
   },
   {
     capabilities: {
@@ -457,7 +457,7 @@ Remember: You represent Somesh professionally. Always be accurate, helpful, and 
  * ------------------------------------------------------------------
  * TOOL REGISTRATION - CONTEXT PROVISION ONLY
  * ------------------------------------------------------------------
- * Clean MCP server architecture: Provides rich portfolio context to Claude.
+    * SB-OMNICORE MCP server architecture: Provides rich portfolio context to Claude.
  * No AI processing - Claude handles analysis, summarization, and intelligence.
  */
 
@@ -476,25 +476,48 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list_projects",
-        description: "Return complete project portfolio (16 projects) with optional filters. Available domains: 'GenAI', 'AI & Machine Learning', 'Computer Vision', 'Web & Cloud', 'IoT & Embedded', 'Data Analytics', 'AR/VR & Immersive Tech'. Popular technologies include: 'Python', 'React', 'Next.js', 'TypeScript', 'OpenCV', 'TensorFlow', 'PyTorch', 'RAG', 'FastAPI', 'OpenAI'. Set featured=true to get 6 highlighted projects. Projects with detailed content available.",
+        description: "Return complete project portfolio (16 projects) with optional filters. Pass all parameters in a single JSON object. Available domains: 'GenAI', 'AI & Machine Learning', 'Computer Vision', 'Web & Cloud', 'IoT & Embedded', 'Data Analytics', 'AR/VR & Immersive Tech'. Popular technologies include: 'Python', 'React', 'Next.js', 'TypeScript', 'OpenCV', 'TensorFlow', 'PyTorch', 'RAG', 'FastAPI', 'OpenAI'. Set featured=true to get 6 highlighted projects. Projects with detailed content available.",
         inputSchema: {
           type: "object",
           properties: {
             category: { 
               type: "string", 
-              description: "Filter by project category/domain",
+              description: "Filter by project category/domain. Must be one of the valid categories.",
               enum: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
             },
             technology: { 
               type: "string", 
-              description: "Filter by specific technology (e.g., 'Python', 'React', 'OpenCV', 'TensorFlow', 'RAG', 'OpenAI')"
+              description: "Filter by specific technology used in projects. Examples: 'Python', 'React', 'OpenCV', 'TensorFlow', 'RAG', 'OpenAI'"
             },
             featured: { 
               type: "boolean", 
-              description: "Filter by featured status - true returns 6 highlighted projects, false returns remaining projects"
+              description: "Filter to show only featured projects (true) or all projects (false/undefined). Must be a boolean value, not a string."
             }
           },
-          required: []
+          required: [],
+          additionalProperties: false,
+          examples: [
+            {
+              description: "Get all projects",
+              value: {}
+            },
+            {
+              description: "Get only featured projects", 
+              value: { "featured": true }
+            },
+            {
+              description: "Get GenAI category projects",
+              value: { "category": "GenAI" }
+            },
+            {
+              description: "Get Python-based projects",
+              value: { "technology": "Python" }
+            },
+            {
+              description: "Get featured GenAI projects",
+              value: { "category": "GenAI", "featured": true }
+            }
+          ]
         }
       },
       {
@@ -576,17 +599,100 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case "list_projects":
       try {
-        const { category, technology, featured } = args as any;
-        const data: any = await client.fetchProjects();
-        let projects = data?.projects || data;
+        // Validate and extract parameters with proper type checking
+        const params = args || {};
+        const { category, technology, featured } = params;
+        
+        // Validate parameter types
+        if (featured !== undefined && typeof featured !== 'boolean') {
+          return {
+            content: [{ type: "text", text: JSON.stringify({
+              error: "Invalid parameter type",
+              message: "The 'featured' parameter must be a boolean (true/false)",
+              received: { featured, type: typeof featured },
+              expected: "boolean",
+              examples: [
+                "Correct: {\"featured\": true}",
+                "Correct: {\"featured\": false}",
+                "Incorrect: {\"featured\": \"true\"}"
+              ]
+            }, null, 2) }],
+            isError: true
+          };
+        }
 
-        // Apply filters
+        if (category !== undefined && typeof category !== 'string') {
+          return {
+            content: [{ type: "text", text: JSON.stringify({
+              error: "Invalid parameter type",
+              message: "The 'category' parameter must be a string",
+              received: { category, type: typeof category },
+              expected: "string",
+              validCategories: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
+            }, null, 2) }],
+            isError: true
+          };
+        }
+
+        if (technology !== undefined && typeof technology !== 'string') {
+          return {
+            content: [{ type: "text", text: JSON.stringify({
+              error: "Invalid parameter type",
+              message: "The 'technology' parameter must be a string",
+              received: { technology, type: typeof technology },
+              expected: "string",
+              examples: ["Python", "React", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"]
+            }, null, 2) }],
+            isError: true
+          };
+        }
+
+        const data: any = await client.fetchProjects();
+        
+        // Fix: Get the correct array from the API response
+        let projects = data?.allProjects || data?.projects || data;
+        
+        // Ensure we have an array to work with
+        if (!Array.isArray(projects)) {
+          console.error('Projects data is not an array:', { 
+            dataKeys: Object.keys(data || {}), 
+            projectsType: typeof projects,
+            projectsValue: projects 
+          });
+          
+          return {
+            content: [{ type: "text", text: JSON.stringify({
+              error: "Invalid data structure",
+              message: "Projects data is not in the expected array format",
+              dataStructure: {
+                available: Object.keys(data || {}),
+                expected: "allProjects array"
+              },
+              troubleshooting: "This might be a temporary API issue. Please try again."
+            }, null, 2) }],
+            isError: true
+          };
+        }
+
+        // Apply filters with safe array operations
         if (category) {
-          projects = projects.filter((p: any) => p.category === category);
+          projects = projects.filter((p: any) => {
+            // Handle both single domain and array of domains
+            if (Array.isArray(p.domain)) {
+              return p.domain.includes(category);
+            }
+            return p.category === category || p.domain === category;
+          });
         }
+        
         if (technology) {
-          projects = projects.filter((p: any) => p.technologies?.includes(technology));
+          projects = projects.filter((p: any) => {
+            // Handle different property names for technologies
+            const technologies = p.technologies || p.tech || p.stack || [];
+            return Array.isArray(technologies) ? technologies.includes(technology) : false;
+          });
         }
+        
         if (featured !== undefined) {
           projects = projects.filter((p: any) => p.featured === featured);
         }
@@ -615,9 +721,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             tier1Projects: enhancedProjects.filter(p => p.contentTier === 'tier1').length,
             tier2Projects: enhancedProjects.filter(p => p.contentTier === 'tier2').length
           },
+          filters: {
+            applied: {
+              category: category || "none",
+              technology: technology || "none", 
+              featured: featured !== undefined ? featured : "none"
+            },
+            available: {
+              categories: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"],
+              technologies: ["Python", "React", "Next.js", "TypeScript", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"],
+              featured: [true, false]
+            }
+          },
           nextActions: {
             suggestion: "For detailed information about any project, use get_project_details with the project ID",
-            example: enhancedProjects.length > 0 ? `get_project_details with id='${enhancedProjects[0].id}'` : "No projects available"
+            example: enhancedProjects.length > 0 ? `get_project_details({\"id\": \"${enhancedProjects[0].id}\"})` : "No projects available"
           }
         };
 
@@ -626,7 +744,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching projects: ${error}` }],
+          content: [{ type: "text", text: JSON.stringify({
+            error: "Failed to fetch projects",
+            message: error instanceof Error ? error.message : String(error),
+            troubleshooting: {
+              checkApiEndpoint: "Verify the portfolio API is accessible",
+              checkDataStructure: "Ensure the API returns the expected data format",
+              retryAction: "Try calling the function again"
+            }
+          }, null, 2) }],
           isError: true
         };
       }
@@ -728,15 +854,27 @@ async function testConnection() {
   }
 }
 
-// For local testing
-export async function main() {
+// Main export function to start the server with different transports
+export async function main(transportType: 'stdio' | 'http' = 'stdio', port?: number) {
+  console.log(`Starting SB-OMNICORE MCP server with ${transportType} transport...`);
+  
   // Test API connection first
   await testConnection();
   
-  // Start MCP server
-  const transport = new StdioServerTransport();
+  // Start MCP server with appropriate transport
+  let transport;
+  if (transportType === 'http') {
+    // Dynamic import for StreamableHTTPServerTransport (for Lambda deployment)
+    const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+    transport = new StreamableHTTPServerTransport({ 
+      sessionIdGenerator: undefined // Stateless mode for Lambda
+    });
+  } else {
+    transport = new StdioServerTransport();
+  }
+  
   await server.connect(transport);
-  console.log('🚀 MCP Server started and ready!');
+  console.log(`🚀 MCP Server is running with ${transportType} transport.`);
 }
 
 // Run if this file is executed directly
