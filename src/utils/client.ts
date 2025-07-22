@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 
-// Use live portfolio website - https://someshbagadiya.dev
-const PORTFOLIO_BASE_URL = process.env.PORTFOLIO_BASE_URL || 'https://someshbagadiya.dev';
+// Use live portfolio website - domain-independent deployment
+const PORTFOLIO_BASE_URL = process.env.PORTFOLIO_BASE_URL || 'https://d2iqjmtdwy7ovv.amplifyapp.com';
 
 export class PortfolioClient {
   private baseUrl: string;
