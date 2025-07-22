@@ -56,16 +56,16 @@ export class PortfolioClient {
   }
 
   /**
-   * Fetch detailed content for a specific project
-   * Fixed: Use the working MCP projects endpoint instead of non-existent content API
+   * Fetch detailed content for a specific project from MCP API
+   * Fixed: Use the correct MCP API endpoint with includeContent parameter
    */
   async fetchProjectContent(projectId: string): Promise<any> {
     try {
-      // Use the working MCP projects endpoint with includeContent=true
+      // Use the MCP projects endpoint with includeContent=true and projectId
       const response = await fetch(`${this.baseUrl}/projects?projectId=${projectId}&includeContent=true`, {
         headers: this.headers,
         // @ts-ignore - timeout is valid for node-fetch
-        timeout: 15000
+        timeout: 10000
       });
       
       if (!response.ok) {
@@ -75,39 +75,37 @@ export class PortfolioClient {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const data: any = await response.json();
+      const project: any = await response.json();
       
-      // Extract the specific project from the response
-      let project = null;
-      if (data.allProjects && Array.isArray(data.allProjects)) {
-        project = data.allProjects.find((p: any) => p.id === projectId);
+      // Check if the project has detailed content
+      if (!project.detailedContent || !project.detailedContent.sections) {
+        return null; // No detailed content available
       }
       
-      if (!project) {
-        return null;
-      }
+      // Use the sections directly from the API response
+      const sections = project.detailedContent.sections;
       
-      // Transform the response to match expected content format
-      let content = '';
-      let wordCount = 0;
-      
-      if (project.detailedContent && project.detailedContent.sections) {
-        const sections = project.detailedContent.sections;
-        content = [
-          `# Project Overview\n${sections.overview || ''}`,
-          `\n\n# Technical Implementation\n${sections.technicalDetails || ''}`,
-          `\n\n# Challenges & Solutions\n${sections.challenges || ''}`,
-          `\n\n# Results & Impact\n${sections.outcomes || ''}`,
-          sections.futureEnhancements ? `\n\n# Future Enhancements\n${sections.futureEnhancements}` : ''
-        ].join('');
-        wordCount = project.detailedContent.wordCount || 0;
-      }
+      // Create content string for compatibility
+      const content = [
+        `# Project Overview\n${sections.overview || ''}`,
+        `\n\n# Technical Implementation\n${sections.technicalDetails || ''}`,
+        `\n\n# Challenges & Solutions\n${sections.challenges || ''}`,
+        `\n\n# Results & Impact\n${sections.outcomes || ''}`,
+        sections.futureEnhancements ? `\n\n# Future Enhancements\n${sections.futureEnhancements}` : ''
+      ].join('');
       
       return {
         projectId,
         content,
-        wordCount,
-        lastModified: project.detailedContent?.lastModified || new Date().toISOString()
+        wordCount: project.detailedContent.wordCount || 0,
+        lastModified: project.detailedContent.lastModified || new Date().toISOString(),
+        sections: {
+          projectoverview: sections.overview || '',
+          technicalimplementation: sections.technicalDetails || '',
+          challengessolutions: sections.challenges || '',
+          resultsimpact: sections.outcomes || '',
+          futureenhancements: sections.futureEnhancements || ''
+        }
       };
       
     } catch (error) {
@@ -136,8 +134,9 @@ export class PortfolioClient {
           sections[currentSection] = currentContent.join('\n').trim();
         }
         
-        // Start new section
-        currentSection = line.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Start new section - normalize section names
+        const sectionName = line.replace(/^#+\s*/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        currentSection = sectionName;
         currentContent = [];
       } else if (currentSection) {
         currentContent.push(line);
@@ -184,7 +183,11 @@ export class PortfolioClient {
       
       // Parse content sections using same logic as RAG system
       let parsedSections: Record<string, string> = {};
-      if (contentData?.content) {
+      if (contentData?.sections) {
+        // Use sections directly from the API response
+        parsedSections = contentData.sections;
+      } else if (contentData?.content) {
+        // Fallback to parsing if only raw content is available
         parsedSections = this.parseContentSections(contentData.content);
       }
       
@@ -192,12 +195,12 @@ export class PortfolioClient {
       const enhancedProject = {
         ...project,
         detailedContent: contentData ? {
-          // RAG-compatible section structure
+          // RAG-compatible section structure - map from parsed sections
           projectoverview: parsedSections.projectoverview || parsedSections.overview || '',
           technicalimplementation: parsedSections.technicalimplementation || parsedSections.technicaldetails || '',
           challengessolutions: parsedSections.challengessolutions || parsedSections.challenges || parsedSections.developmentchallenges || '',
           resultsimpact: parsedSections.resultsimpact || parsedSections.projectimpact || parsedSections.outcomes || '',
-          futureEnhancements: parsedSections.futureEnhancements || parsedSections.futureimprovements || '',
+          futureEnhancements: parsedSections.futureenhancements || parsedSections.futureimprovements || '',
           // Raw content and metadata
           rawContent: contentData.content || '',
           wordCount: contentData.wordCount || 0,

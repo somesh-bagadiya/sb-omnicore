@@ -1,26 +1,15 @@
 service: sb-omnicore-mcp
-
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 provider:
   name: aws
   runtime: nodejs18.x
-  stage: production
+  timeout: 30
   region: us-west-2
   memorySize: 256
-  timeout: 30
   environment:
     PORTFOLIO_BASE_URL: https://someshbagadiya.dev
     NODE_ENV: production
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-          Resource: '*'
 
 functions:
   mcpServer:
@@ -28,32 +17,13 @@ functions:
     description: 'SB-OMNICORE MCP server for Somesh Bagadiya portfolio'
     events:
       - http:
-          path: /
-          method: ANY
+          path: mcp
+          method: post
           cors: true
       - http:
-          path: /{proxy+}
-          method: ANY
+          path: mcp
+          method: options
           cors: true
 
 plugins:
-  - serverless-offline
-
-custom:
-  serverless-offline:
-    httpPort: 3001
-    host: 0.0.0.0
-
-package:
-  exclude:
-    - src/**
-    - '*.md'
-    - '.git/**'
-    - '.gitignore'
-    - 'mcp-server.zip'
-    - tsconfig.json
-    - '.serverless/**'
-  include:
-    - build/**
-    - package.json
-    - node_modules/** 
+  - serverless-offline 

@@ -3,18 +3,11 @@
   "version": "1.0.0",
   "description": "SB-OMNICORE MCP server providing AI assistants with Somesh Bagadiya's portfolio context",
   "type": "module",
-  "main": "build/index.js",
-  "bin": {
-    "sb-omnicore-mcp": "build/stdio-server.js"
-  },
+  "main": "build/lambda.js",
   "scripts": {
     "build": "tsc",
-    "start:stdio": "node build/stdio-server.js",
-    "start:server": "node build/index.js",
-    "dev": "tsc --watch",
-    "test": "npm run build && node build/test.js",
-    "test:local": "npm run build && node build/test.js",
     "deploy": "serverless deploy",
+    "remove": "serverless remove",
     "offline": "serverless offline"
   },
   "keywords": [

@@ -231,13 +231,12 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
                   purpose: "Browse project portfolio (16 projects)",
                   filterOptions: {
                     domains: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"],
-                    popularTechnologies: ["Python", "React", "Next.js", "TypeScript", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"],
                     featured: "Set to true for 6 highlighted projects"
                   },
                   examples: [
+                    "list_projects",
                     "list_projects with featured=true",
-                    "list_projects with category='GenAI'",
-                    "list_projects with technology='Python'"
+                    "list_projects with domain='GenAI'"
                   ]
                 },
                 get_project_details: {
@@ -472,22 +471,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {},
           required: []
+        },
+        annotations: {
+          title: "Get Professional Profile",
+          readOnlyHint: true,
+          openWorldHint: false
         }
       },
       {
         name: "list_projects",
-        description: "Return complete project portfolio (16 projects) with optional filters. Pass all parameters in a single JSON object. Available domains: 'GenAI', 'AI & Machine Learning', 'Computer Vision', 'Web & Cloud', 'IoT & Embedded', 'Data Analytics', 'AR/VR & Immersive Tech'. Popular technologies include: 'Python', 'React', 'Next.js', 'TypeScript', 'OpenCV', 'TensorFlow', 'PyTorch', 'RAG', 'FastAPI', 'OpenAI'. Set featured=true to get 6 highlighted projects. Projects with detailed content available.",
+        description: "Return complete project portfolio (16 projects) with optional filters. Use domain filter for project categories or featured filter for highlighted projects. All projects have detailed content available via get_project_details.",
         inputSchema: {
           type: "object",
           properties: {
-            category: { 
+            domain: { 
               type: "string", 
-              description: "Filter by project category/domain. Must be one of the valid categories.",
+              description: "Filter by project domain/category. Must be one of the valid domains.",
               enum: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
-            },
-            technology: { 
-              type: "string", 
-              description: "Filter by specific technology used in projects. Examples: 'Python', 'React', 'OpenCV', 'TensorFlow', 'RAG', 'OpenAI'"
             },
             featured: { 
               type: "boolean", 
@@ -506,33 +506,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               value: { "featured": true }
             },
             {
-              description: "Get GenAI category projects",
-              value: { "category": "GenAI" }
-            },
-            {
-              description: "Get Python-based projects",
-              value: { "technology": "Python" }
+              description: "Get GenAI domain projects",
+              value: { "domain": "GenAI" }
             },
             {
               description: "Get featured GenAI projects",
-              value: { "category": "GenAI", "featured": true }
+              value: { "domain": "GenAI", "featured": true }
             }
           ]
+        },
+        annotations: {
+          title: "List Portfolio Projects",
+          readOnlyHint: true,
+          openWorldHint: false
         }
       },
       {
         name: "get_project_details",
-        description: "Return complete project details by ID including structured content from detailed project files. Automatically includes: basic project info, detailed content sections (Overview, Technical Implementation, Challenges & Solutions, Results & Impact), word count, and content tier classification. Available project IDs: 'personal-portfolio-website', 'introspect-ai', 'carbon-sense-powered-by-ibm-watsonx', 'rage-chrome-extension-for-personalized-rag', 'reflectra-ai-digital-journal', 'email-intent-analysis', 'synchronous-traffic-signals', 'market-prediction-using-lstms', 'eye-tracking-and-gaze-tracking', 'dc-insulation-monitoring-system', 'port-config', 'quotation-generator-application', 'iot-based-self-driving-car-with-adas', 'high-on-tech', 'creva', 'voice-assistant'.",
+        description: "Return complete project details by ID including structured content from detailed project files. Automatically includes: basic project info, detailed content sections (Overview, Technical Implementation, Challenges & Solutions, Results & Impact), word count, and content tier classification. Available project IDs: 'sb-omnicore-mcp-server','personal-portfolio-website', 'introspect-ai', 'carbon-sense-powered-by-ibm-watsonx', 'rage-chrome-extension-for-personalized-rag', 'reflectra-ai-digital-journal', 'email-intent-analysis', 'synchronous-traffic-signals', 'market-prediction-using-lstms', 'eye-tracking-and-gaze-tracking', 'dc-insulation-monitoring-system', 'port-config', 'quotation-generator-application', 'iot-based-self-driving-car-with-adas', 'high-on-tech', 'creva', 'voice-assistant'.",
         inputSchema: {
           type: "object",
           properties: {
             id: { 
               type: "string", 
               description: "Project ID to retrieve. Must be one of the 16 available project IDs (e.g., 'introspect-ai', 'personal-portfolio-website', 'carbon-sense-powered-by-ibm-watsonx')",
-              enum: ["personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx", "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms", "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config", "quotation-generator-application", "iot-based-self-driving-car-with-adas", "high-on-tech", "creva", "voice-assistant"]
+              enum: ["sb-omnicore-mcp-server","personal-portfolio-website", "introspect-ai", "carbon-sense-powered-by-ibm-watsonx", "rage-chrome-extension-for-personalized-rag", "reflectra-ai-digital-journal", "email-intent-analysis", "synchronous-traffic-signals", "market-prediction-using-lstms", "eye-tracking-and-gaze-tracking", "dc-insulation-monitoring-system", "port-config", "quotation-generator-application", "iot-based-self-driving-car-with-adas", "high-on-tech", "creva", "voice-assistant"]
             }
           },
           required: ["id"]
+        },
+        annotations: {
+          title: "Get Project Details",
+          readOnlyHint: true,
+          openWorldHint: false
         }
       },
       {
@@ -555,6 +561,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: []
+        },
+        annotations: {
+          title: "List Work Experiences",
+          readOnlyHint: true,
+          openWorldHint: false
         }
       },
       {
@@ -573,6 +584,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: []
+        },
+        annotations: {
+          title: "List Education",
+          readOnlyHint: true,
+          openWorldHint: false
         }
       }
     ]
@@ -601,7 +617,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         // Validate and extract parameters with proper type checking
         const params = args || {};
-        const { category, technology, featured } = params;
+        const { domain, featured } = params;
         
         // Validate parameter types
         if (featured !== undefined && typeof featured !== 'boolean') {
@@ -621,27 +637,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        if (category !== undefined && typeof category !== 'string') {
+        if (domain !== undefined && typeof domain !== 'string') {
           return {
             content: [{ type: "text", text: JSON.stringify({
               error: "Invalid parameter type",
-              message: "The 'category' parameter must be a string",
-              received: { category, type: typeof category },
+              message: "The 'domain' parameter must be a string",
+              received: { domain, type: typeof domain },
               expected: "string",
-              validCategories: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
-            }, null, 2) }],
-            isError: true
-          };
-        }
-
-        if (technology !== undefined && typeof technology !== 'string') {
-          return {
-            content: [{ type: "text", text: JSON.stringify({
-              error: "Invalid parameter type",
-              message: "The 'technology' parameter must be a string",
-              received: { technology, type: typeof technology },
-              expected: "string",
-              examples: ["Python", "React", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"]
+              validDomains: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"]
             }, null, 2) }],
             isError: true
           };
@@ -675,21 +678,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         // Apply filters with safe array operations
-        if (category) {
+        if (domain) {
           projects = projects.filter((p: any) => {
             // Handle both single domain and array of domains
             if (Array.isArray(p.domain)) {
-              return p.domain.includes(category);
+              return p.domain.includes(domain);
             }
-            return p.category === category || p.domain === category;
-          });
-        }
-        
-        if (technology) {
-          projects = projects.filter((p: any) => {
-            // Handle different property names for technologies
-            const technologies = p.technologies || p.tech || p.stack || [];
-            return Array.isArray(technologies) ? technologies.includes(technology) : false;
+            return p.domain === domain;
           });
         }
         
@@ -723,13 +718,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
           filters: {
             applied: {
-              category: category || "none",
-              technology: technology || "none", 
+              domain: domain || "none",
               featured: featured !== undefined ? featured : "none"
             },
             available: {
-              categories: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"],
-              technologies: ["Python", "React", "Next.js", "TypeScript", "OpenCV", "TensorFlow", "PyTorch", "RAG", "FastAPI", "OpenAI"],
+              domains: ["GenAI", "AI & Machine Learning", "Computer Vision", "Web & Cloud", "IoT & Embedded", "Data Analytics", "AR/VR & Immersive Tech"],
               featured: [true, false]
             }
           },
